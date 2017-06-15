@@ -339,7 +339,7 @@ module ManageIQ::Providers::Kubernetes
         get_container_port_configs_graph(container_definition, children[:container_port_configs])
         get_container_env_vars_graph(container_definition, children[:container_env_vars])
         get_container_security_context_graph(container_definition, children[:security_context]) if children[:security_context]
-        get_containers_graph(container_definition, children[:container]) if children[:container]
+        get_container_graph(container_definition, children[:container]) if children[:container]
       end
     end
 
@@ -365,7 +365,7 @@ module ManageIQ::Providers::Kubernetes
       collection.build(h)
     end
 
-    def get_containers_graph(parent, h)
+    def get_container_graph(parent, h)
       collection = @inv_collections[:containers]
 
       h[:container_definition] = parent
