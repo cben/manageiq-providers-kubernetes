@@ -51,6 +51,10 @@ module ManageIQ::Providers::Kubernetes
       get_pods_graph(inventory)
       get_services_graph(inventory)
       get_component_statuses_graph(inventory)
+      # The following use images resulting from parsing pods, so must be called after.
+      # TODO: openshift images parsing will have to plug before this.
+      get_container_images_graph(inventory)
+      get_container_image_registries_graph(inventory)
 
       @inv_collections.values
     end
@@ -365,8 +369,7 @@ module ManageIQ::Providers::Kubernetes
       collection = @inv_collections[:containers]
 
       h[:container_definition] = parent
-
-      _container_image = h.delete(:container_image)
+      h[:container_image] = lazy_find_image(h[:container_image])
 
       collection.build(h)
     end
@@ -397,6 +400,26 @@ module ManageIQ::Providers::Kubernetes
       inv["component_status"].each do |cs|
         h = parse_component_status(cs)
         collection.build(h)
+      end
+    end
+
+    def get_container_image_registries_graph(inv)
+      collection = @inv_collections[:container_image_registries]
+      # Resulting from previously parsed images
+      registries = @data_index.fetch_path(:container_image_registry, :by_host_and_port) || []
+      registries.each do |_host_port, ir|
+        collection.build(ir)
+      end
+    end
+
+    def get_container_images_graph(inv)
+      collection = @inv_collections[:container_images]
+      # Resulting from previously parsed images
+      images = @data_index.fetch_path(:container_image, :by_digest) || []
+      images.each do |_digest, im|
+        im = im.merge(:container_image_registry => lazy_find_image_registry(im[:container_image_registry]))
+        _custom_attrs = im.extract!(:labels, :docker_labels)
+        collection.build(im)
       end
     end
 
@@ -1147,6 +1170,21 @@ module ManageIQ::Providers::Kubernetes
     def lazy_find_project(hash)
       return if hash.nil?
       @inv_collections[:container_projects].lazy_find(hash[:ems_ref])
+    end
+
+    def lazy_find_image(hash)
+      return nil if hash.nil?
+      hash = hash.merge(:container_image_registry => lazy_find_image_registry(hash[:container_image_registry]))
+      @inv_collections[:container_images].lazy_find(
+        @inv_collections[:container_images].object_index(hash)
+      )
+    end
+
+    def lazy_find_image_registry(hash)
+      return nil if hash.nil?
+      @inv_collections[:container_image_registries].lazy_find(
+        @inv_collections[:container_image_registries].object_index(hash)
+      )
     end
   end
 end

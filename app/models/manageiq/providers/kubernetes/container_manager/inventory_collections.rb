@@ -79,7 +79,8 @@ module ManageIQ::Providers::Kubernetes::ContainerManager::InventoryCollections
         :parent         => ems,
         :builder_params => {:ems_id => ems.id},
         :association    => :container_images,
-        :manager_ref    => [:image_ref, :container_image_registry],
+        # TODO old save matches on [:image_ref, :container_image_registry_id]
+        :manager_ref    => [:image_ref],
       )
 
     @inv_collections[:container_groups] =
