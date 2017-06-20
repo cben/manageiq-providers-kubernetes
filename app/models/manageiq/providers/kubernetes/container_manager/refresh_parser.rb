@@ -115,6 +115,10 @@ module ManageIQ::Providers::Kubernetes
       process_collection(inventory["endpoint"], :container_endpoints) { |n| parse_endpoint(n) }
 
       @data[:container_endpoints].each do |ep|
+        cgs = ep.delete(:container_groups_refs).collect do |ref|
+          @data_index.fetch_path(path_for_entity("pod"), :by_namespace_and_name, ref[:namespace], ref[:name])
+        end
+        ep[:container_groups] = cgs.compact
         @data_index.store_path(:container_endpoints, :by_namespace_and_name,
                                ep[:namespace], ep[:name], ep)
       end
@@ -666,17 +670,12 @@ module ManageIQ::Providers::Kubernetes
 
     def parse_endpoint(entity)
       new_result = parse_base_item(entity)
-      new_result[:container_groups] = []
+      new_result[:container_groups_refs] = []
 
       (entity.subsets || []).each do |subset|
         (subset.addresses || []).each do |address|
           next if address.targetRef.try(:kind) != 'Pod'
-          cg = @data_index.fetch_path(
-            path_for_entity("pod"), :by_namespace_and_name,
-            # namespace is overriden in more_core_extensions and hence needs
-            # a non method access
-            address.targetRef["table"][:namespace], address.targetRef.name)
-          new_result[:container_groups] << cg unless cg.nil?
+          new_result[:container_groups_refs] << address.targetRef
         end
       end
 
