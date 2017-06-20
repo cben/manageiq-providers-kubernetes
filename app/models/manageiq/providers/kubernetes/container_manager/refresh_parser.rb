@@ -203,13 +203,17 @@ module ManageIQ::Providers::Kubernetes
 
         h.except!(:namespace, :tags)
 
-        _custom_attrs = h.extract!(:labels, :additional_attributes)
+        _labels = h.delete(:labels)
+        _additional_attributes = @data_index.fetch_path(:additional_attributes, :by_node, h[:name])
         children = h.extract!(:container_conditions, :computer_system)
 
         node = collection.build(h)
 
         get_node_container_conditions_graph(node, children[:container_conditions])
         get_node_computer_systems_graph(node, children[:computer_system])
+
+        # Subset needed for lazy_find_node_by_name
+        @data_index.store_path(path_for_entity("node"), :by_name, h[:name], h.slice(:ems_ref))
       end
     end
 
@@ -261,7 +265,7 @@ module ManageIQ::Providers::Kubernetes
       inv["resource_quota"].each do |quota|
         h = parse_quota(quota)
 
-        h[:container_project] = lazy_find_project(h.delete(:project))
+        h[:container_project] = lazy_find_project_by_name(h.delete(:namespace))
 
         items = h.delete(:container_quota_items)
         get_container_quota_items_graph(h, items)
@@ -284,7 +288,7 @@ module ManageIQ::Providers::Kubernetes
       inv["limit_range"].each do |data|
         h = parse_range(data)
 
-        h[:container_project] = lazy_find_project(h.delete(:project))
+        h[:container_project] = lazy_find_project_by_name(h.delete(:namespace))
         items = h.delete(:container_limit_items)
 
         limit = collection.build(h)
@@ -309,7 +313,7 @@ module ManageIQ::Providers::Kubernetes
 
         h.except!(:namespace, :tags)
 
-        h[:container_project] = lazy_find_project(h.delete(:project))
+        h[:container_project] = lazy_find_project_by_name(h.delete(:namespace))
         _custom_attrs = h.extract!(:labels, :selector_parts)
 
         collection.build(h)
@@ -334,8 +338,13 @@ module ManageIQ::Providers::Kubernetes
       inv["persistent_volume"].each do |pv|
         h = parse_persistent_volume(pv)
 
-        h.except!(:namespace)
+        h.except!(:namespace) # TODO project untested?
 
+        _pvc_ref = h.delete(:persistent_volume_claim_ref)
+        #h[:persistent_volume_claim] = pvc_ref && @data_index.fetch_path(
+        #                                path_for_entity("persistent_volume_claim"),
+        #                                :by_namespace_and_name, pvc_ref[:namespace], pvc_ref[:name]
+        #                              )
         collection.build(h)
       end
     end
@@ -346,10 +355,12 @@ module ManageIQ::Providers::Kubernetes
       inv["pod"].each do |pod|
         h = parse_pod(pod)
 
-        h.except!(:tags, :namespace)
+        h.except!(:tags)
 
-        h[:container_project] = lazy_find_project(h.delete(:project))
+        h[:container_project] = lazy_find_project_by_name(h.delete(:namespace))
+        h[:container_node] = lazy_find_node_by_name(h.delete(:container_node_name))
 
+        _container_replicator = h.delete(:container_replicator_ref) # TODO lazy_find
         _build_pod_name = h.delete(:build_pod_name)
         _custom_attrs   = h.extract!(:labels, :node_selector_parts)
         children        = h.extract!(:container_definitions, :containers, :container_conditions, :container_volumes)
@@ -412,15 +423,17 @@ module ManageIQ::Providers::Kubernetes
       inv["service"].each do |service|
         h = parse_service(service)
 
-        h.except!(:tags, :namespace)
-
-        h[:container_project] = lazy_find_project(h.delete(:project))
+        h[:container_project] = lazy_find_project_by_name(h[:namespace]) # TODO untested?
 
         _custom_attrs = h.extract!(:labels, :selector_parts)
         _children     = h.extract!(:container_service_port_configs)
 
         _container_image_registry = h.delete(:container_image_registry)
-        _container_groups         = h.delete(:container_groups)
+        _container_groups         = @data_index.fetch_path(
+          :container_endpoints, :by_namespace_and_name, h[:namespace], h[:name],
+          :container_groups) # TODO lazy_find
+
+        h.except!(:tags, :namespace)
 
         collection.build(h)
       end
@@ -600,6 +613,7 @@ module ManageIQ::Providers::Kubernetes
       ports = service.spec.ports
       new_result[:container_service_port_configs] = Array(ports).collect do |port_entry|
         pc = parse_service_port_config(port_entry, new_result[:ems_ref])
+        # TODO below only works for last port config - BUG?
         new_result[:container_image_registry] = @data_index.fetch_path(
           :container_image_registry, :by_host_and_port, "#{new_result[:portal_ip]}:#{pc[:port]}"
         )
@@ -1158,6 +1172,10 @@ module ManageIQ::Providers::Kubernetes
       @inv_collections[:container_projects].lazy_find(hash[:ems_ref])
     end
 
+    def lazy_find_project_by_name(name)
+      lazy_find_project(@data_index.fetch_path(path_for_entity("namespace"), :by_name, name))
+    end
+
     def lazy_find_image(hash)
       return nil if hash.nil?
       hash = hash.merge(:container_image_registry => lazy_find_image_registry(hash[:container_image_registry]))
@@ -1171,6 +1189,13 @@ module ManageIQ::Providers::Kubernetes
       @inv_collections[:container_image_registries].lazy_find(
         @inv_collections[:container_image_registries].object_index(hash)
       )
+    end
+
+    def lazy_find_node_by_name(name)
+      return nil if name.nil?
+      # TODO: could we directly lazy_find nodes by name?
+      hash = @data_index.fetch_path(path_for_entity("node"), :by_name, name)
+      @inv_collections[:container_nodes].lazy_find(hash[:ems_ref])
     end
   end
 end
