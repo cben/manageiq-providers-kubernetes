@@ -72,6 +72,11 @@ module ManageIQ::Providers::Kubernetes
       key = path_for_entity("service")
       process_collection(inventory["service"], key) { |s| parse_service(s) }
       @data[key].each do |se|
+        se[:container_groups] = @data_index.fetch_path(
+          :container_endpoints, :by_namespace_and_name, se[:namespace], se[:name],
+          :container_groups
+        )
+        se[:project] = @data_index.fetch_path(path_for_entity("namespace"), :by_name, se[:namespace])
         @data_index.store_path(key, :by_namespace_and_name, se[:namespace], se[:name], se)
       end
     end
@@ -557,10 +562,6 @@ module ManageIQ::Providers::Kubernetes
         new_result[:ems_ref] = "#{new_result[:namespace]}_#{new_result[:name]}"
       end
 
-      container_groups = @data_index.fetch_path(
-        :container_endpoints, :by_namespace_and_name, new_result[:namespace],
-        new_result[:name], :container_groups)
-
       labels = parse_labels(service)
       new_result.merge!(
         # TODO: We might want to change portal_ip to clusterIP
@@ -570,7 +571,6 @@ module ManageIQ::Providers::Kubernetes
         :labels           => labels,
         :tags             => map_labels('ContainerService', labels),
         :selector_parts   => parse_selector_parts(service),
-        :container_groups => container_groups
       )
 
       ports = service.spec.ports
@@ -582,8 +582,6 @@ module ManageIQ::Providers::Kubernetes
         pc
       end
 
-      new_result[:project] = @data_index.fetch_path(path_for_entity("namespace"), :by_name,
-                                                    service.metadata["table"][:namespace])
       new_result
     end
 
