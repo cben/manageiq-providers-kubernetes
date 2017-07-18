@@ -9,4 +9,28 @@ unless gem_root.join("spec/manageiq").exist?
 end
 
 require gem_root.join("spec/manageiq/lib/manageiq/environment").to_s
+
+# TEMP DEBUG
+module ManageIQ::Environment
+  def self.bundle_update(root = APP_ROOT)
+    system!("#{bundle_env} bundle update #{bundle_params}", :chdir => root)
+    system!("#{bundle_env} bundle show manageiq-providers-openshift", :chdir => root)
+  end
+
+  def self.bundle_env
+    "env BUNDLE_PATH=${BUNDLE_PATH:-vendor/bundle}" if ENV['CI']
+  end
+
+  def self.bundle_params
+    "--verbose --jobs=3 --retry=3" if ENV['CI']
+  end
+
+  def self.system!(*args)
+    options = args.last.kind_of?(Hash) ? args.pop : {}
+    options[:chdir] ||= APP_ROOT
+    puts "system *#{args}, #{options}" # DEBUG
+    system(*args, options) || abort("\n== Command #{args} failed in #{options[:chdir]} ==")
+  end
+end
+
 ManageIQ::Environment.manageiq_plugin_setup
