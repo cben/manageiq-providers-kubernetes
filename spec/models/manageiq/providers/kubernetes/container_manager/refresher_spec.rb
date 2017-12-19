@@ -552,7 +552,7 @@ shared_examples "kubernetes refresher VCR tests" do
 end
 
 describe ManageIQ::Providers::Kubernetes::ContainerManager::Refresher do
-  context "classical refresh" do
+  context "classical refresh", :aggregate_failures do
     before(:each) do
       stub_settings_merge(
         :ems_refresh => {:kubernetes => {:inventory_object_refresh => false}}
@@ -573,7 +573,7 @@ describe ManageIQ::Providers::Kubernetes::ContainerManager::Refresher do
       expect(ManageIQ::Providers::Kubernetes::ContainerManager::RefreshParser).not_to receive(:ems_inv_to_hashes)
     end
 
-    context "with :default saver" do
+    context "with :default saver", :aggregate_failures do
       before(:each) do
         stub_settings_merge(
           :ems_refresh => {:kubernetes => {:inventory_collections => {:saver_strategy => :default}}}
@@ -584,7 +584,7 @@ describe ManageIQ::Providers::Kubernetes::ContainerManager::Refresher do
       include_examples "kubernetes refresher VCR tests"
     end
 
-    context "with :batch saver" do
+    context "with :batch saver", :aggregate_failures do
       before(:each) do
         stub_settings_merge(
           :ems_refresh => {:kubernetes => {:inventory_collections => {:saver_strategy => :batch}}}
