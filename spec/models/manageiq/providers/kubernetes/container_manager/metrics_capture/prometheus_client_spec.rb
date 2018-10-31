@@ -1,6 +1,7 @@
 describe ManageIQ::Providers::Kubernetes::ContainerManager::MetricsCapture::PrometheusClient do
   before(:each) do
-    allow(MiqServer).to receive(:my_zone).and_return("default")
+    EvmSpecHelper.local_miq_server(:zone => Zone.seed)
+
     hostname = 'prometheus.example.com'
     token = 'good_token'
     @ems = FactoryGirl.create(

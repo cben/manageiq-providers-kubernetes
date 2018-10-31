@@ -1,7 +1,8 @@
 # instantiated at the end
 shared_examples "openshift refresher VCR targeted refresh tests" do
   before(:each) do
-    allow(MiqServer).to receive(:my_zone).and_return("default")
+    EvmSpecHelper.local_miq_server(:zone => Zone.seed)
+
     hostname          = 'host.example.com'
     token             = 'theToken'
     hawkular_hostname = 'host.example.com'

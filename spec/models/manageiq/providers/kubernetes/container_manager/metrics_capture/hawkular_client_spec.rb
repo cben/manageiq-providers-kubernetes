@@ -1,6 +1,7 @@
 describe ManageIQ::Providers::Kubernetes::ContainerManager::MetricsCapture::HawkularClient do
   before(:each) do
-    allow(MiqServer).to receive(:my_zone).and_return("default")
+    EvmSpecHelper.local_miq_server(:zone => Zone.seed)
+
     hostname = 'hawkular.example.com'
     token = 'the_token'
 

@@ -2,7 +2,8 @@ describe ManageIQ::Providers::Kubernetes::ContainerManager::MetricsCapture::Hawk
   @node = nil
 
   before(:each) do
-    allow(MiqServer).to receive(:my_zone).and_return("default")
+    EvmSpecHelper.local_miq_server(:zone => Zone.seed)
+
     hostname = 'capture.context.com'
     token = 'theToken'
 

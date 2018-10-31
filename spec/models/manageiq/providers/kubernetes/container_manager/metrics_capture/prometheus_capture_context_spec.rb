@@ -3,7 +3,7 @@ describe ManageIQ::Providers::Kubernetes::ContainerManager::MetricsCapture::Prom
     @record = :none
     # @record = :new_episodes
 
-    allow(MiqServer).to receive(:my_zone).and_return("default")
+    EvmSpecHelper.local_miq_server(:zone => Zone.seed)
 
     master_hostname = 'master.example.com'
     hostname = 'prometheus.example.com'
